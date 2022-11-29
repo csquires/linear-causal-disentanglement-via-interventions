@@ -1,12 +1,11 @@
 # === IMPORTS: THIRD-PARTY ===
 import numpy as np
 from numpy.linalg import cholesky, inv
-from scipy.linalg import rq
 import causaldag as cd
 
 # === IMPORTS: LOCAL ===
-from src.utils.linalg import SubspaceFloat, get_rank_one_factors, normalize, normalize_H, RQ_partial_order
-from src.dataset import Dataset2
+from src.utils.linalg import SubspaceFloat, get_rank_one_factors, normalize, normalize_H
+from src.dataset import Dataset
 from src.rank_tester import ExactRankOneScorer, RankOneScorer, SVDRankOneScorer
 from src.row_extractor import SingleRowExtractor, MaxNormSingleRowExtractor
 from src.utils.misc import argmax_dict
@@ -76,7 +75,7 @@ class IterativeProjectionPartialOrderSolver:
 
     def solveQ(
         self,
-        ds: Dataset2, 
+        ds: Dataset, 
         true_ds=None, 
         verbose=False
     ) -> np.ndarray:
@@ -110,7 +109,7 @@ class IterativeProjectionPartialOrderSolver:
 
     def solve_given_Q(
         self,
-        ds: Dataset2,
+        ds: Dataset,
         Q_est: np.ndarray,
         env_ix2target
     ):
@@ -153,7 +152,7 @@ class IterativeProjectionPartialOrderSolver:
 
     def solve(
         self, 
-        ds: Dataset2, 
+        ds: Dataset, 
         true_ds=None,
         verbose=False
     ):
@@ -165,7 +164,7 @@ class IterativeProjectionPartialOrderSolver:
     def check_solution(
         self,
         sol,
-        ds: Dataset2
+        ds: Dataset
     ):
         # === STEP 1: CHECK THAT THE SOLUTION GIVES THE RIGHT OUTPUT
         H_est = sol["H_est"]
@@ -193,26 +192,3 @@ class IterativeProjectionPartialOrderSolver:
             &
             all_interventions_perfect
         )
-
-
-if __name__ == "__main__":
-    import causaldag as cd
-    from src.rand import rand_model
-
-    nnodes = 4
-    nodes2num_ivs = {i: 1 for i in range(nnodes)}
-    perm_gen = list(range(nnodes))
-    dag = cd.rand.directed_erdos(nnodes, density=1.0, random_order=False)
-    ds = rand_model(
-        dag, 
-        nodes2num_ivs, 
-        perm_gen, 
-        upper_triangular_h=False,
-        orthogonal_h=False,
-        rational=False,
-        no_perm=True
-    )
-
-    solver = AllOrdersIterativeProjectionSolver()
-    H_est = solver.solve(ds)
-    

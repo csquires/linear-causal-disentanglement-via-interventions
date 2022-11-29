@@ -2,7 +2,6 @@
 import random
 
 # === IMPORTS: THIRD-PARTY ===
-import sympy
 import numpy as np
 import causaldag as cd
 from scipy.linalg import orth

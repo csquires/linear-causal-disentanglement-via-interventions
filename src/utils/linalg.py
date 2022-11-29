@@ -5,8 +5,6 @@ from typing import List
 import numpy as np
 from numpy.linalg import svd, lstsq
 from scipy.linalg import null_space, orth
-from sympy import Matrix, sqrt
-from sympy.matrices import GramSchmidt
 import causaldag as cd
 from scipy.linalg import rq
 
@@ -118,78 +116,12 @@ class MatrixSubspaceFloat:
 
 
 
-class Subspace:
-    def __init__(self, vecs: List[np.ndarray]):
-        """
-        A class representing a linear subspace.
-
-        Params
-        ------
-        vecs: a list of vectors
-        """
-        self.vecs = Matrix(vecs).T
-
-        # === REPRESENT THE SUBSPACE
-        aa = GramSchmidt([Matrix(v) for v in vecs], orthonormal=True)
-        self.W = Matrix(aa)
-
-        # === REPRESENT THE ORTHOCOMPLEMENT OF THE SUBSPACE
-        nullspace = self.vecs.nullspace()
-        bb = GramSchmidt(nullspace, orthonormal=True)
-        self.Wperp = Matrix.hstack(*bb)
-
-    @property
-    def dim(self):
-        return self.W.shape[1]
-
-    def add(self, vecs):
-        pass
-
-    def project(self, vec):
-        pass
-
-
-class MatrixSubspace:
-    def __init__(self, mats, vecs=None):
-        print("Rank one factors")
-        new_vecs = [get_rank_one_factors_sympy(mat)[0] for mat in mats]
-        existing_vecs = [] if vecs is None else vecs
-        self.vecs = new_vecs + existing_vecs
-        self.subspace = Subspace(self.vecs)
-
-    def add(self, mats):
-        return MatrixSubspace(mats, vecs=self.vecs) 
-
-    def project_on_on(self, mat):
-        return proj_mat(mat, self.subspace.W, self.subspace.W)
-
-    def project_on_orth(self, mat):
-        return proj_mat(mat, self.subspace.W, self.subspace.Wperp)
-
-    def project_orth_on(self, mat):
-        return proj_mat(mat, self.subspace.Wperp, self.subspace.W)
-
-    def project_orth_orth(self, mat):
-        return proj_mat(mat, self.subspace.Wperp, self.subspace.Wperp)
-
-
 def get_rank_one_factors(M):
     u_mat, s, v_mat = svd(M)
     ix = np.argmax(s)
     sval = s[ix]
     a1, a2 = u_mat[:, ix], v_mat[ix]
     return a1 * np.sqrt(sval), a2 * np.sqrt(sval)
-
-
-def get_rank_one_factors_sympy(M: Matrix):
-    print("SVD in rank_one_factors")
-    print(M.shape)
-    uu, ss, vv = M.singular_value_decomposition()
-    print("Done")
-    ix = np.argmax(ss)
-    sval = ss[ix]
-    a1, a2 = uu[:, ix], vv[ix]
-    return a1 * sqrt(sval), a2 * sqrt(sval)
 
 
 def proj_vec(v, W):

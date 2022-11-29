@@ -2,7 +2,7 @@
 from argparse import ArgumentParser, BooleanOptionalAction
 
 # === IMPORTS: LOCAL ===
-from src.run_experiment import ExperimentRunner
+from experiments.run_experiment import ExperimentRunner
 
 # === ARGUMENT PARSING ===
 parser = ArgumentParser()

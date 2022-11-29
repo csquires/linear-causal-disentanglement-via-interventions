@@ -116,7 +116,6 @@ class ExperimentRunner:
                 list(range(self.nnodes)), 
                 upper_triangular_h=False,
                 orthogonal_h=False,
-                rational=False,
                 no_perm=True,
                 shuffle_targets=True
             )
