@@ -11,7 +11,7 @@ parser.add_argument("--nsamples_list", type=int, nargs="+", default=[2500, 5000,
 parser.add_argument("--nruns", type=int, default=500)
 parser.add_argument("--density", type=float, default=0.75)
 parser.add_argument("--rank_gamma", type=float, default=0.99)
-parser.add_argument("--seed", type=int, default=None)
+parser.add_argument("--seed", type=int, default=689729)
 parser.add_argument("--overwrite", type=BooleanOptionalAction, default=False)
 args = parser.parse_args()
 # ===============================================

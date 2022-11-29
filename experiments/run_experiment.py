@@ -29,7 +29,12 @@ def standardize(Q: np.ndarray):
     return Q * signs[:, None]
 
 
-def permute_solution(H_est, B0_est, ix2target_est, perm):
+def permute_solution(
+    H_est: np.ndarray, 
+    B0_est: np.ndarray, 
+    ix2target_est: dict, 
+    perm: list
+):
     P = get_permutation_matrix(perm)
     H_est_perm = P @ H_est
     B0_est_perm = P @ B0_est @ P.T
@@ -186,7 +191,6 @@ class ExperimentRunner:
         # === ARRAYS FOR RESULTS
         H_errors = np.zeros((nruns, len(nsamples_list)))
         B0_errors = np.zeros((nruns, len(nsamples_list)))
-        Q_errors = np.zeros((nruns, len(nsamples_list)))
         correct_orders = np.zeros((nruns, len(nsamples_list)))
 
         # === POPULATE ARRAYS
@@ -198,7 +202,7 @@ class ExperimentRunner:
                     H_error, B0_error, correct_order = find_best_permutation_match(run_results)
                 else:
                     # === TRUE DATA
-                    ds: Dataset2 = run_results["ds"]
+                    ds: Dataset = run_results["ds"]
                     B0_true = ds.B_obs
                     H_true = ds.H
                     B_trues = ds.Bs
@@ -220,17 +224,16 @@ class ExperimentRunner:
                 B0_errors[r_ix, s_ix] = B0_error
                 correct_orders[r_ix, s_ix] = correct_order
 
-        return H_errors, B0_errors, Q_errors, correct_orders
+        return H_errors, B0_errors, correct_orders
 
 
     def plot(self, local=True):
         info = self.load_info()
         metadata = info["metadata"]
         nsamples_list = metadata["nsamples_list"]
-        H_errors, B0_errors, Q_errors, correct_orders = self.compute_errors()
+        H_errors, B0_errors, correct_orders = self.compute_errors()
 
         avg_H_error = np.median(H_errors, axis=0)
-        avg_Q_error = np.median(Q_errors, axis=0)
         avg_B0_error = np.median(B0_errors, axis=0)
         percent_correct_order = np.mean(correct_orders, axis=0)
 
@@ -241,15 +244,6 @@ class ExperimentRunner:
         os.makedirs(folder, exist_ok=True)
         sns.set()
         plt.style.use("style.mplstyle")
-        # === PLOT ERRORS IN Q ===
-        plt.clf()
-        plt.plot(nsamples_list, avg_Q_error)
-        plt.xscale("log")
-        plt.xlabel("Number of samples")
-        plt.ylabel("Median Frobenius error in Q")
-        plt.tight_layout()
-        plt.savefig(f"{folder}/avg_Q_error.png")
-        if local: plt.savefig(os.path.expanduser("~/Downloads/avg_Q_error.png"))
 
         # === PLOT ERRORS IN H ===
         plt.clf()
