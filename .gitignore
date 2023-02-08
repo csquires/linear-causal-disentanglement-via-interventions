@@ -1,3 +1,6 @@
 venv/
 **/__pycache__/**
 experiments/experiment1/results/*
+experiments/real_data/raw_data/
+experiments/real_data/processed/
+!experiments/real_data/raw_data/mixed_variants_2_each.txt
