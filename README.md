@@ -18,3 +18,7 @@ For the semi-synthetic results, run
 ```
 bash experiments/real_data/semisynthetic.sh
 ```
+For real-data results, run
+```
+bash experiments/real_data/real.sh
+```
