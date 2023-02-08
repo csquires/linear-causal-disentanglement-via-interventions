@@ -23,6 +23,9 @@ from src.utils.permutations import get_permutation_matrix
 from src.matching import IntegerProgram
 
 
+DEFAULT_PERMUTATION_METHOD = "ilp"
+
+
 def permute_solution(H_est, B0_est, B_ests, ix2target_est, perm):
     P = get_permutation_matrix(perm)
     H_est_perm = P @ H_est
@@ -133,7 +136,7 @@ class ExperimentRunnerHelper:
         plot_folder: str,
         seed = 0,
         rank_gamma = 0.99,
-        find_best_permutation = "ilp"
+        find_best_permutation = DEFAULT_PERMUTATION_METHOD
     ):
         self.datasets = datasets
         self.num_latent = num_latent
@@ -311,7 +314,7 @@ class ExperimentRunner:
         seed: int = None,
         density: float = 0.5,
         rank_gamma: float = 1 - 1e-8,
-        find_best_permutation = "ilp",
+        find_best_permutation = DEFAULT_PERMUTATION_METHOD,
         nnodes_obs: int = None,
         iv_type: str = "hard",
         experiment_name: str = "experiment1"
