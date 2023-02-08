@@ -17,9 +17,9 @@ import networkx as nx
 
 # === IMPORTS: LOCAL ===
 from src.solver_partial_order import IterativeProjectionPartialOrderSolver
-from src.rank_testers import SVDRankOneScorer
+from src.rank_tester import SVDRankOneScorer
 from src.rand import rand_model
-from src.dataset import Dataset2
+from src.dataset import Dataset
 from src.utils.permutations import get_permutation_matrix
 from src.matching import IntegerProgram
 
@@ -44,7 +44,7 @@ def permute_solution(H_est, B0_est, B_ests, ix2target_est, perm):
 
 def find_best_permutation_match_ilp(run_results: dict):
     # === TRUE DATA
-    ds: Dataset2 = run_results["ds"]
+    ds: Dataset = run_results["ds"]
     B0_true = ds.B_obs
     B1_true = ds.Bs[0]
     H_true = ds.H
@@ -88,7 +88,7 @@ def find_best_permutation_match_ilp(run_results: dict):
 
 def find_best_permutation_match_naive2(run_results: dict):
     # === TRUE DATA
-    ds: Dataset2 = run_results["ds"]
+    ds: Dataset = run_results["ds"]
     B0_true = ds.B_obs
     B1_true = ds.Bs[0]
     H_true = ds.H
@@ -134,7 +134,7 @@ def find_best_permutation_match_naive2(run_results: dict):
 
 def find_best_permutation_match_naive(run_results: dict):
     # === TRUE DATA
-    ds: Dataset2 = run_results["ds"]
+    ds: Dataset = run_results["ds"]
     B0_true = ds.B_obs
     B1_true = ds.Bs[0]
     H_true = ds.H
@@ -210,7 +210,7 @@ def find_best_permutation_match_naive(run_results: dict):
 class ExperimentRunnerHelper:
     def __init__(
         self, 
-        datasets: List[Dataset2],
+        datasets: List[Dataset],
         nsamples_list: List[int],
         num_latent: int,
         result_filename: str,
@@ -278,6 +278,7 @@ class ExperimentRunnerHelper:
                         time_spent=time_spent
                 )
 
+            os.makedirs(os.path.dirname(self.result_filename), exist_ok=True)
             pickle.dump(info, open(self.result_filename, "wb"))
         else:
             info = pickle.load(open(self.result_filename, "rb"))
@@ -315,7 +316,7 @@ class ExperimentRunnerHelper:
                     H_error, B0_error, B1_error, correct_order, perm, nmatches = find_best_permutation_match_ilp(run_results)
                 else:
                     # === TRUE DATA
-                    ds: Dataset2 = run_results["ds"]
+                    ds: Dataset = run_results["ds"]
                     B0_true = ds.B_obs
                     H_true = ds.H
                     B_trues = ds.Bs
@@ -372,8 +373,8 @@ class ExperimentRunnerHelper:
         plt.xlabel("Number of samples")
         plt.ylabel("Mean Frobenius error in Q")
         plt.tight_layout()
-        plt.savefig(f"{self.plot_folder}/avg_Q_error.png")
-        if local: plt.savefig(os.path.expanduser("~/Downloads/avg_Q_error.png"))
+        # plt.savefig(f"{self.plot_folder}/avg_Q_error.png")
+        # if local: plt.savefig(os.path.expanduser("~/Downloads/avg_Q_error.png"))
 
         # === PLOT ERRORS IN H ===
         plt.clf()
@@ -382,9 +383,9 @@ class ExperimentRunnerHelper:
         plt.xlabel("Number of samples")
         plt.ylabel("Mean Frobenius error in $H$")
         plt.tight_layout()
-        plt.savefig(f"{self.plot_folder}/avg_H_error.png")
+        # plt.savefig(f"{self.plot_folder}/avg_H_error.png")
         plt.savefig(f"{self.plot_folder}/avg_H_error.pdf")
-        if local: plt.savefig(os.path.expanduser("~/Downloads/avg_H_error.png"))
+        # if local: plt.savefig(os.path.expanduser("~/Downloads/avg_H_error.png"))
 
         plt.clf()
         plt.plot(nsamples_list, median_H_error)
@@ -392,8 +393,8 @@ class ExperimentRunnerHelper:
         plt.xlabel("Number of samples")
         plt.ylabel("Median Frobenius error in $H$")
         plt.tight_layout()
-        plt.savefig(f"{self.plot_folder}/median_H_error.png")
-        if local: plt.savefig(os.path.expanduser("~/Downloads/median_H_error.png"))
+        # plt.savefig(f"{self.plot_folder}/median_H_error.png")
+        # if local: plt.savefig(os.path.expanduser("~/Downloads/median_H_error.png"))
 
         # === PLOT ERRORS IN B0 ===
         plt.clf()
@@ -402,9 +403,9 @@ class ExperimentRunnerHelper:
         plt.xlabel("Number of samples")
         plt.ylabel("Mean Frobenius error in $B_0$")
         plt.tight_layout()
-        plt.savefig(f"{self.plot_folder}/avg_B0_error.png")
+        # plt.savefig(f"{self.plot_folder}/avg_B0_error.png")
         plt.savefig(f"{self.plot_folder}/avg_B0_error.pdf")
-        if local: plt.savefig(os.path.expanduser("~/Downloads/avg_B0_error.png"))
+        # if local: plt.savefig(os.path.expanduser("~/Downloads/avg_B0_error.png"))
 
         plt.clf()
         plt.plot(nsamples_list, median_B0_error)
@@ -412,8 +413,8 @@ class ExperimentRunnerHelper:
         plt.xlabel("Number of samples")
         plt.ylabel("Median Frobenius error in $B_0$")
         plt.tight_layout()
-        plt.savefig(f"{self.plot_folder}/median_B0_error.png")
-        if local: plt.savefig(os.path.expanduser("~/Downloads/median_B0_error.png"))
+        # plt.savefig(f"{self.plot_folder}/median_B0_error.png")
+        # if local: plt.savefig(os.path.expanduser("~/Downloads/median_B0_error.png"))
 
         # === PLOT ERRORS IN B1 ===
         plt.clf()
@@ -422,8 +423,8 @@ class ExperimentRunnerHelper:
         plt.xlabel("Number of samples")
         plt.ylabel("Mean Frobenius error in $B_1$")
         plt.tight_layout()
-        plt.savefig(f"{self.plot_folder}/avg_B1_error.png")
-        if local: plt.savefig(os.path.expanduser("~/Downloads/avg_B1_error.png"))
+        # plt.savefig(f"{self.plot_folder}/avg_B1_error.png")
+        # if local: plt.savefig(os.path.expanduser("~/Downloads/avg_B1_error.png"))
 
         plt.clf()
         plt.plot(nsamples_list, median_B1_error)
@@ -431,8 +432,8 @@ class ExperimentRunnerHelper:
         plt.xlabel("Number of samples")
         plt.ylabel("Median Frobenius error in $B_1$")
         plt.tight_layout()
-        plt.savefig(f"{self.plot_folder}/median_B1_error.png")
-        if local: plt.savefig(os.path.expanduser("~/Downloads/median_B1_error.png"))
+        # plt.savefig(f"{self.plot_folder}/median_B1_error.png")
+        # if local: plt.savefig(os.path.expanduser("~/Downloads/median_B1_error.png"))
 
         # === PLOT ERRORS IN ORDER ===
         plt.clf()
@@ -441,9 +442,9 @@ class ExperimentRunnerHelper:
         plt.xlabel("Number of samples")
         plt.ylabel("Fraction with all \nintervention targets correct")
         plt.tight_layout()
-        plt.savefig(f"{self.plot_folder}/percent_correct_order.png")
+        # plt.savefig(f"{self.plot_folder}/percent_correct_order.png")
         plt.savefig(f"{self.plot_folder}/percent_correct_order.pdf")
-        if local: plt.savefig(os.path.expanduser("~/Downloads/percent_correct_order.png"))
+        # if local: plt.savefig(os.path.expanduser("~/Downloads/percent_correct_order.png"))
 
 
 class ExperimentRunner2:

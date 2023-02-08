@@ -9,7 +9,7 @@ class SingleRowExtractor:
         pass
 
 
-class MaxNormSingleRowExtractor(SingleRowExtractor):
+class ExactSingleRowExtractor(SingleRowExtractor):
     def __init__(self, tol=1e-8):
         self.tol = tol
 
@@ -21,3 +21,4 @@ class MaxNormSingleRowExtractor(SingleRowExtractor):
         target = np.argmax(norms)
         row = mat[target]
         return target, row
+        

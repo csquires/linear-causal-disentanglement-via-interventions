@@ -1,13 +1,11 @@
 # === IMPORTS: BUILT-IN ===
-import pickle
 from argparse import ArgumentParser
 
 # === IMPORTS: THIRD-PARTY ===
 import numpy as np
-import causaldag as cd
 
 # === IMPORTS: LOCAL ===
-from src.dataset import Dataset2
+from src.dataset import Dataset
 from src.run_experiment import ExperimentRunnerHelper
 from experiments.real_data.config import get_solution
 
@@ -41,7 +39,7 @@ Bs = [B for ix, B in sol["B_ests"].items()]
 num_latent = len(Bs)
 ix2target = sol["ix2target"]
 datasets = [
-    Dataset2(B_obs, np.eye(num_latent), H, Bs, ix2target) 
+    Dataset(B_obs, np.eye(num_latent), H, Bs, ix2target) 
     for _ in range(NRUNS)
 ]
 
@@ -57,5 +55,5 @@ er = ExperimentRunnerHelper(
     rank_gamma=rank_gamma,
     find_best_permutation="ilp"
 )
-er.run(overwrite=False)
+er.run(overwrite=True)
 er.plot()

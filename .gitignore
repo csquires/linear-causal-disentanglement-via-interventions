@@ -1,6 +1,16 @@
 venv/
 **/__pycache__/**
+
+# synthetic data
 experiments/experiment1/results/*
+
+# real data
 experiments/real_data/raw_data/
 experiments/real_data/processed/
+experiments/real_data/semisynthetic_distributions/
+experiments/real_data/semisynthetic_outputs/
+
+# files required for analyzing real data
 !experiments/real_data/raw_data/mixed_variants_2_each.txt
+!experiments/real_data/raw_data/all_variants.txt
+!experiments/real_data/raw_data/prolif_ensembl

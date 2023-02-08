@@ -1,13 +1,14 @@
 # === IMPORTS: THIRD-PARTY ===
 import numpy as np
-from numpy.linalg import cholesky, inv
+from numpy.linalg import cholesky, inv, pinv
 import causaldag as cd
+from tqdm import trange
 
 # === IMPORTS: LOCAL ===
-from src.utils.linalg import SubspaceFloat, get_rank_one_factors, normalize, normalize_H
+from src.utils.linalg import get_rank_one_factors, normalize, normalize_H, orthogonal_projection_matrix
 from src.dataset import Dataset
-from src.rank_tester import ExactRankOneScorer, RankOneScorer, SVDRankOneScorer
-from src.row_extractor import SingleRowExtractor, MaxNormSingleRowExtractor
+from src.rank_tester import ExactRankOneScorer, RankOneScorer
+from src.row_extractor import SingleRowExtractor, ExactSingleRowExtractor
 from src.utils.misc import argmax_dict
 
 
@@ -15,47 +16,57 @@ class IterativeProjectionPartialOrderSolver:
     def __init__(
         self,
         rank_one_scorer: RankOneScorer = ExactRankOneScorer(),
-        single_row_extractor: SingleRowExtractor = MaxNormSingleRowExtractor(),
-        rank_gamma: float = 1 - 1e-8
+        single_row_extractor: SingleRowExtractor = ExactSingleRowExtractor(),
+        rank_gamma: float = 1 - 1e-8,
+        num_latent: int = None
     ):
         self.rank_one_scorer = rank_one_scorer
         self.single_row_extractor = single_row_extractor
         self.rank_gamma = rank_gamma
+        self.num_latent = num_latent
 
     def prune_ancestors(
         self,
         envs2qvecs: dict,
         Theta_node: np.ndarray,
         Theta_obs: np.ndarray,
+        ancestor_dict: dict,
+        verbose=False
     ):
-        ancestors = set(envs2qvecs.keys())
+        parents = set(envs2qvecs.keys())
         for env_ix, _ in envs2qvecs.items():
             other_qvecs = [qvec for e, qvec in envs2qvecs.items() if e != env_ix]
-            subspace = SubspaceFloat(other_qvecs, vlength=Theta_obs.shape[0])
-            projectedThetaDiff = subspace.project_orth_orth(Theta_node - Theta_obs)
+            projectedThetaDiff = orthogonal_projection_matrix(other_qvecs, Theta_node - Theta_obs)
             score = self.rank_one_scorer.score(projectedThetaDiff)
             if score > self.rank_gamma:
-                ancestors.remove(env_ix)
-
-        qvecs_ancestors = [envs2qvecs[node] for node in ancestors]
-        subspace = SubspaceFloat(qvecs_ancestors, vlength=Theta_obs.shape[0])
-        projectedThetaDiff = subspace.project_orth_orth(Theta_node - Theta_obs)
+                parents.remove(env_ix)
+            if verbose: print(score, env_ix)
+        
+        all_ancestors = parents.copy()
+        for p in parents:
+            all_ancestors |= ancestor_dict[p]
+        qvecs_ancestors = [envs2qvecs[node] for node in all_ancestors]
+        projectedThetaDiff = orthogonal_projection_matrix(qvecs_ancestors, Theta_node - Theta_obs)
+        
         new_qvec = get_rank_one_factors(projectedThetaDiff)[0]
+        new_qvec_norm = normalize(new_qvec)
 
-        return new_qvec, ancestors
+        return new_qvec_norm, all_ancestors
 
     def pick_next_node(
         self,
         envs2qvecs: dict,
         remaining_Thetas: dict,
-        Theta_obs: np.ndarray
+        Theta_obs: np.ndarray,
+        ancestor_dict: dict,
+        verbose = False
     ):
         full_qvecs = [qvec for _, qvec in envs2qvecs.items()]
-        full_subspace = SubspaceFloat(full_qvecs, vlength=Theta_obs.shape[0])
         projectedThetaDiffs = {
-            env_ix: full_subspace.project_orth_orth(Theta - Theta_obs)
+            env_ix: orthogonal_projection_matrix(full_qvecs, Theta - Theta_obs)
             for env_ix, Theta in remaining_Thetas.items()
         }
+        
         rank_one_scores = {
             env_ix: self.rank_one_scorer.score(pdiff)
             for env_ix, pdiff in projectedThetaDiffs.items()
@@ -69,7 +80,13 @@ class IterativeProjectionPartialOrderSolver:
             envs2qvecs,
             Theta,
             Theta_obs,
+            ancestor_dict,
+            verbose=verbose
         )
+        ancestor_dict[next_env_ix] = ancestors
+
+        if verbose:
+            print(f"Picked {next_env_ix} with ancestors {ancestors}")
 
         return next_env_ix, ancestors, qvec
 
@@ -81,27 +98,31 @@ class IterativeProjectionPartialOrderSolver:
     ) -> np.ndarray:
         Theta_obs = ds.Theta_obs
         p = Theta_obs.shape[0]
+        d = self.num_latent
         remaining_Thetas = dict(enumerate(ds.Thetas))
         envs2qvecs = dict()
 
-        partial_order = cd.DAG()
+        partial_order = cd.DAG(nodes=set(range(d)))
         env_ix2target = dict()
-        for latent_node_ix in range(p-1, -1, -1):
+        ancestor_dict = dict()
+        for latent_node_ix in trange(d-1, -1, -1):
             next_env_ix, parent_env_ixs, new_qvec = self.pick_next_node(
-                envs2qvecs, 
-                remaining_Thetas, 
-                Theta_obs, 
+                envs2qvecs,
+                remaining_Thetas,
+                Theta_obs,
+                ancestor_dict,
+                verbose=verbose
             )
             partial_order.add_arcs_from(
-                {(env_ix2target[p_ix], latent_node_ix) for p_ix in parent_env_ixs}
+                {(p_ix, next_env_ix) for p_ix in parent_env_ixs}
             )
 
             env_ix2target[next_env_ix] = latent_node_ix
-            envs2qvecs[next_env_ix] = normalize(new_qvec)
+            envs2qvecs[next_env_ix] = new_qvec
             del remaining_Thetas[next_env_ix]
 
         # R, Q = RQ_partial_order(ds.H, partial_order)
-        Q_est = np.zeros((p, p))
+        Q_est = np.zeros((d, p))
         for env_ix, qvec in envs2qvecs.items():
             Q_est[env_ix2target[env_ix]] = qvec
 
@@ -113,7 +134,7 @@ class IterativeProjectionPartialOrderSolver:
         Q_est: np.ndarray,
         env_ix2target
     ):
-        Q_est_inv = inv(Q_est)
+        Q_est_inv = pinv(Q_est)
         orthogonalized_Theta0 = Q_est_inv.T @ ds.Theta_obs @ Q_est_inv
         C0_est = cholesky(orthogonalized_Theta0).T  # L such that L L.T == M
         orthogonalized_Thetas = {
@@ -122,7 +143,7 @@ class IterativeProjectionPartialOrderSolver:
         }
         C_ests = {ix: cholesky(ot).T for ix, ot in orthogonalized_Thetas.items()}
 
-        R_est = np.zeros(Q_est.shape)
+        R_est = np.zeros((self.num_latent, self.num_latent))
         ix2target = dict()
         for ix, C_est in C_ests.items():
             diff = C_est - C0_est
@@ -133,20 +154,31 @@ class IterativeProjectionPartialOrderSolver:
             R_est[target] = rvec
 
         H_est = R_est @ Q_est
-        H_est = normalize_H(H_est)
-        H_est_inv = inv(H_est)
+        H_est, lambda_vals = normalize_H(H_est, return_scaling=True)
+        H_est_inv = pinv(H_est)
         B0_est = cholesky(H_est_inv.T @ ds.Theta_obs @ H_est_inv).T
-        B_ests = {
-            ix: cholesky(H_est_inv.T @ Theta @ H_est_inv).T
-            for ix, Theta in enumerate(ds.Thetas)
-        }
+        B_ests = dict()
+        for ix in range(len(ds.Thetas)):
+            B_est = B0_est.copy()
+            B_est[ix2target[ix]] = 0
+            lam = abs(lambda_vals[ix2target[ix]])
+            B_est[ix2target[ix], ix2target[ix]] = lam
+            B_ests[ix] = B_est
+        
+        # B_ests2 = {
+        #     ix: cholesky(H_est_inv.T @ Theta @ H_est_inv).T
+        #     for ix, Theta in enumerate(ds.Thetas)
+        # }
+        # for ix in B_ests:
+        #     print(np.max(np.abs(B_ests[ix] - B_ests2[ix])))
+        # breakpoint()
 
         sol = dict(
             H_est=H_est,
             B0_est=B0_est,
             B_ests=B_ests,
             Q_est=Q_est,
-            ix2target=env_ix2target
+            ix2target=ix2target
         )
         return sol
 
@@ -192,3 +224,5 @@ class IterativeProjectionPartialOrderSolver:
             &
             all_interventions_perfect
         )
+
+

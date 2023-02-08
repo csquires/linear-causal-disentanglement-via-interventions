@@ -1,21 +1,30 @@
-# === IMPORTS: BUILT-IN ===
-from typing import List
-
 # === IMPORTS: THIRD-PARTY ===
 import numpy as np
 from numpy.linalg import svd, lstsq
-from scipy.linalg import null_space, orth
 import causaldag as cd
 from scipy.linalg import rq
+
+
+def orthogonal_projection_matrix(vecs, mat):
+    if len(vecs) == 0:
+        return mat
+    vmat = np.vstack(vecs).T
+    xx2, _, _, _  = lstsq(vmat, mat, rcond=None)
+    oo1 = mat - vmat @ xx2
+
+    xx2, _, _, _ = lstsq(vmat, oo1.T, rcond=None)
+    oo2 = oo1 - (vmat @ xx2).T
+    
+    return oo2
 
 
 def RQ_partial_order(
     H: np.ndarray, 
     partial_order: cd.DAG
 ):
-    Q = np.zeros(H.shape)
-    R = np.zeros(H.shape)
-    p = H.shape[0]
+    d, p = H.shape
+    R = np.zeros((d, d))
+    Q = np.zeros((d, p))
     order = partial_order.topological_sort()
 
     for i in order:
@@ -36,84 +45,24 @@ def RQ_partial_order(
     
     diff = R @ Q - H
     mdiff = np.max(np.abs(diff))
-    print(mdiff)
+    print("diff RQ-H", mdiff)
 
     return R, Q
-
 
 
 def normalize(vec):
     return vec / np.linalg.norm(vec)
 
 
-def normalize_H(H):
+def normalize_H(H, return_scaling=False):
     p = H.shape[0]
     argmax_ixs = np.argmax(np.abs(H), axis=1)
     argmax_vals = H[list(range(p)), argmax_ixs]
     Hnew = H / argmax_vals[:, None]
-    return Hnew
-
-
-class SubspaceFloat:
-    def __init__(self, vecs: List[np.ndarray], vlength=None):
-        self.vecs = vecs
-        if len(vecs) > 0:
-            self.W = orth(np.array(vecs).T)  # p * d
-            self.Wperp = null_space(self.W.T)  # p * (p - d)
-        else:
-            self.W = np.zeros((vlength, 0))
-            self.Wperp = np.eye(vlength)
-
-    @property
-    def ambient_dim(self):
-        return self.W.shape[0]
-
-    @property
-    def dim(self):
-        return self.W.shape[1]
-
-    def quotient(self, mat):
-        assert mat.shape[0] == self.ambient_dim
-        return self.Wperp @ self.Wperp.T @ mat
-
-    def add(self, vecs: List[np.ndarray]):
-        return SubspaceFloat(self.vecs + vecs)
-
-    def project_on_on(self, mat):
-        return proj_mat(mat, self.W, self.W)
-
-    def project_on_orth(self, mat):
-        return proj_mat(mat, self.W, self.Wperp)
-
-    def project_orth_on(self, mat):
-        return proj_mat(mat, self.Wperp, self.W)
-
-    def project_orth_orth(self, mat):
-        return proj_mat(mat, self.Wperp, self.Wperp)
-
-
-class MatrixSubspaceFloat:
-    def __init__(self, mats, vecs=None):
-        new_vecs = [get_rank_one_factors(mat)[0] for mat in mats]
-        existing_vecs = [] if vecs is None else vecs
-        self.vecs = new_vecs + existing_vecs
-        self.subspace = SubspaceFloat(self.vecs)
-
-    def add(self, mats):
-        return MatrixSubspaceFloat(mats, vecs=self.vecs) 
-
-    def project_on_on(self, mat):
-        return proj_mat(mat, self.subspace.W, self.subspace.W)
-
-    def project_on_orth(self, mat):
-        return proj_mat(mat, self.subspace.W, self.subspace.Wperp)
-
-    def project_orth_on(self, mat):
-        return proj_mat(mat, self.subspace.Wperp, self.subspace.W)
-
-    def project_orth_orth(self, mat):
-        return proj_mat(mat, self.subspace.Wperp, self.subspace.Wperp)
-
+    if return_scaling:
+        return Hnew, argmax_vals
+    else:
+        return Hnew
 
 
 def get_rank_one_factors(M):
@@ -126,34 +75,3 @@ def get_rank_one_factors(M):
 
 def proj_vec(v, W):
     return W @ W.T @ v
-
-
-def proj_mat(M, W1, W2):
-    """
-    Given a `p*p` matrix `M`, a `p*r1` matrix `W1`, and a `p*r2` matrix `W2`,
-    project the rows of `M` onto `W1` and the columns of `M` onto `W2`
-    """
-    p1, p2, p3 = M.shape[0], W1.shape[0], W2.shape[0]
-    assert p1 == p2 and p2 == p3
-    return W1 @ W1.T @ M @ W2 @ W2.T
-
-
-
-if __name__ == "__main__":
-    # H = np.random.uniform(size=(4, 4))
-    # partial_order = cd.DAG(arcs={(3, 0), (2, 0), (2, 1)})
-    # R, Q = RQ_partial_order(H, partial_order)
-    # print(R)
-    # print(np.isclose(Q @ Q.T, 0).astype(int))
-
-    H = np.random.uniform(size=(4, 4))
-    partial_order = cd.DAG(arcs={(3, 2), (2, 1), (1, 0)})
-    R, Q = RQ_partial_order(H, partial_order)
-    print(R)
-    R2, Q2 = rq(H)
-    print(np.isclose(Q @ Q.T, 0).astype(int))
-
-    # H = np.random.uniform(size=(4, 4))
-    # partial_order = cd.DAG(nodes={0, 1, 2, 3})
-    # R, Q = RQ_partial_order(H, partial_order)
-    # print(np.isclose(Q @ Q.T, 0).astype(int))
