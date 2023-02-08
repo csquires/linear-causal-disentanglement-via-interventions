@@ -7,7 +7,7 @@ bash setup.sh
 
 To reproduce the synthetic data results, run:
 ```
-python3 -m experiments.experiment1.noisy_recovery --seed 689729
+python3 -m experiments.experiment1.noisy_recovery --seed 8164 --nnodes 5 --nnodes_obs 10
 ```
 
 To reproduce the real data results, first download the data:

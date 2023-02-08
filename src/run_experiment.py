@@ -12,7 +12,6 @@ import causaldag as cd
 from tqdm import trange
 import matplotlib.pyplot as plt
 import seaborn as sns
-from scipy.linalg import rq
 import networkx as nx
 
 # === IMPORTS: LOCAL ===
@@ -22,14 +21,6 @@ from src.rand import rand_model
 from src.dataset import Dataset
 from src.utils.permutations import get_permutation_matrix
 from src.matching import IntegerProgram
-
-
-def standardize(Q):
-    ppp = Q.shape[0]
-    first_nonzero_ixs = np.argmax(Q != 0, axis=1)
-    first_nonzero_vals = Q[(list(range(ppp)), first_nonzero_ixs)]
-    signs = np.sign(first_nonzero_vals)
-    return Q * signs[:, None]
 
 
 def permute_solution(H_est, B0_est, B_ests, ix2target_est, perm):
@@ -86,7 +77,7 @@ def find_best_permutation_match_ilp(run_results: dict):
     return solution
 
 
-def find_best_permutation_match_naive2(run_results: dict):
+def find_best_permutation_match_naive(run_results: dict):
     # === TRUE DATA
     ds: Dataset = run_results["ds"]
     B0_true = ds.B_obs
@@ -128,81 +119,6 @@ def find_best_permutation_match_naive2(run_results: dict):
 
             best_solution = (H_error, B0_error, B1_error, correct_order, perm, nmatches)
             best_nmatches = nmatches
-        
-    return best_solution
-
-
-def find_best_permutation_match_naive(run_results: dict):
-    # === TRUE DATA
-    ds: Dataset = run_results["ds"]
-    B0_true = ds.B_obs
-    B1_true = ds.Bs[0]
-    H_true = ds.H
-    B_trues = ds.Bs
-    p = B0_true.shape[0]
-
-    # === ESTIMATES
-    H_est = run_results["H_est"]
-    B0_est = run_results["B0_est"]
-    B1_est = run_results["B_ests"][0]
-    B_ests = run_results["B_ests"]
-    ix2target = run_results["ix2target"]
-
-    min_B0_error = float('inf')
-    best_solution = None
-    true_graph = nx.DiGraph([(i, j) for i, j in itr.combinations(range(p), 2) if ds.B_obs[i, j] != 0])
-    true_graph.add_nodes_from(list(range(p)))
-    for perm in nx.all_topological_sorts(true_graph):
-        H_est_perm, B0_est_perm, B_ests_perm, ix2target_est_perm = permute_solution(
-            H_est,
-            B0_est,
-            B_ests,
-            ix2target,
-            perm
-        )
-
-        # === ERRORS
-        H_error = np.linalg.norm(H_true - H_est_perm)
-        B0_error = np.linalg.norm(B0_true - B0_est_perm)
-        B1_error = np.linalg.norm(B1_true - B_ests_perm[0])
-        matches = [ds.ix2target[ix] == ix2target_est_perm[ix] for ix in ix2target]
-        correct_order = all(matches)
-
-        if B0_error < min_B0_error:
-            min_B0_error = B0_error
-            best_solution = (H_error, B0_error, B1_error, correct_order, perm)
-
-            # record the below for debugging
-            best_perm = perm
-            best_ix2target_preperm = ix2target
-            best_H_est = np.round(H_est_perm, 3)
-            best_B0_est = np.round(B0_est_perm, 3)
-            best_B_ests_perm = {ix: np.round(B_est, 3) for ix, B_est in B_ests_perm.items()}
-            best_ix2target = ix2target_est_perm
-    
-    print("=========")
-    print(best_ix2target)
-    print(ds.ix2target)
-    
-    # if not best_solution[-1]:
-    #     print("True B0:")
-    #     print(np.round(B0_true, 3))
-    #     print("Estimated B0:")
-    #     print(best_B0_est)
-
-    #     print("True ix2target:")
-    #     print(ds.ix2target)
-    #     print("Estimated ix2target:")
-    #     print(best_ix2target)
-
-    #     for ix, B_est in best_B_ests_perm.items():
-    #         print("=========")
-    #         print(f"True B{ix}:")
-    #         print(B_trues[ix])
-    #         print(f"Estimated B{ix}:")
-    #         print(B_est)
-        
-    #     breakpoint()
         
     return best_solution
 
@@ -311,7 +227,7 @@ class ExperimentRunnerHelper:
                 run_results = results[(s_ix, r_ix)]
 
                 if self.find_best_permutation == "naive":
-                    H_error, B0_error, B1_error, correct_order, perm, nmatches = find_best_permutation_match_naive2(run_results)
+                    H_error, B0_error, B1_error, correct_order, perm, nmatches = find_best_permutation_match_naive(run_results)
                 elif self.find_best_permutation == "ilp":
                     H_error, B0_error, B1_error, correct_order, perm, nmatches = find_best_permutation_match_ilp(run_results)
                 else:
@@ -344,7 +260,6 @@ class ExperimentRunnerHelper:
 
         return H_errors, B0_errors, B1_errors, Q_errors, correct_orders
 
-
     def plot(self, local=True):
         info = self.load_info()
         metadata = info["metadata"]
@@ -352,29 +267,12 @@ class ExperimentRunnerHelper:
         H_errors, B0_errors, B1_errors, Q_errors, correct_orders = self.compute_errors()
 
         avg_H_error = np.mean(H_errors, axis=0)
-        avg_Q_error = np.mean(Q_errors, axis=0)
         avg_B0_error = np.mean(B0_errors, axis=0)
-        avg_B1_error = np.mean(B1_errors, axis=0)
         percent_correct_order = np.mean(correct_orders, axis=0)
 
-        median_H_error = np.median(H_errors, axis=0)
-        median_Q_error = np.median(Q_errors, axis=0)
-        median_B0_error = np.median(B0_errors, axis=0)
-        median_B1_error = np.median(B1_errors, axis=0)
-        percent_correct_order = np.mean(correct_orders, axis=0)
-        
         os.makedirs(self.plot_folder, exist_ok=True)
         sns.set()
         plt.style.use("style.mplstyle")
-        # === PLOT ERRORS IN Q ===
-        plt.clf()
-        plt.plot(nsamples_list, avg_Q_error)
-        plt.xscale("log")
-        plt.xlabel("Number of samples")
-        plt.ylabel("Mean Frobenius error in Q")
-        plt.tight_layout()
-        # plt.savefig(f"{self.plot_folder}/avg_Q_error.png")
-        # if local: plt.savefig(os.path.expanduser("~/Downloads/avg_Q_error.png"))
 
         # === PLOT ERRORS IN H ===
         plt.clf()
@@ -383,18 +281,7 @@ class ExperimentRunnerHelper:
         plt.xlabel("Number of samples")
         plt.ylabel("Mean Frobenius error in $H$")
         plt.tight_layout()
-        # plt.savefig(f"{self.plot_folder}/avg_H_error.png")
         plt.savefig(f"{self.plot_folder}/avg_H_error.pdf")
-        # if local: plt.savefig(os.path.expanduser("~/Downloads/avg_H_error.png"))
-
-        plt.clf()
-        plt.plot(nsamples_list, median_H_error)
-        plt.xscale("log")
-        plt.xlabel("Number of samples")
-        plt.ylabel("Median Frobenius error in $H$")
-        plt.tight_layout()
-        # plt.savefig(f"{self.plot_folder}/median_H_error.png")
-        # if local: plt.savefig(os.path.expanduser("~/Downloads/median_H_error.png"))
 
         # === PLOT ERRORS IN B0 ===
         plt.clf()
@@ -403,37 +290,7 @@ class ExperimentRunnerHelper:
         plt.xlabel("Number of samples")
         plt.ylabel("Mean Frobenius error in $B_0$")
         plt.tight_layout()
-        # plt.savefig(f"{self.plot_folder}/avg_B0_error.png")
         plt.savefig(f"{self.plot_folder}/avg_B0_error.pdf")
-        # if local: plt.savefig(os.path.expanduser("~/Downloads/avg_B0_error.png"))
-
-        plt.clf()
-        plt.plot(nsamples_list, median_B0_error)
-        plt.xscale("log")
-        plt.xlabel("Number of samples")
-        plt.ylabel("Median Frobenius error in $B_0$")
-        plt.tight_layout()
-        # plt.savefig(f"{self.plot_folder}/median_B0_error.png")
-        # if local: plt.savefig(os.path.expanduser("~/Downloads/median_B0_error.png"))
-
-        # === PLOT ERRORS IN B1 ===
-        plt.clf()
-        plt.plot(nsamples_list, avg_B1_error)
-        plt.xscale("log")
-        plt.xlabel("Number of samples")
-        plt.ylabel("Mean Frobenius error in $B_1$")
-        plt.tight_layout()
-        # plt.savefig(f"{self.plot_folder}/avg_B1_error.png")
-        # if local: plt.savefig(os.path.expanduser("~/Downloads/avg_B1_error.png"))
-
-        plt.clf()
-        plt.plot(nsamples_list, median_B1_error)
-        plt.xscale("log")
-        plt.xlabel("Number of samples")
-        plt.ylabel("Median Frobenius error in $B_1$")
-        plt.tight_layout()
-        # plt.savefig(f"{self.plot_folder}/median_B1_error.png")
-        # if local: plt.savefig(os.path.expanduser("~/Downloads/median_B1_error.png"))
 
         # === PLOT ERRORS IN ORDER ===
         plt.clf()
@@ -442,12 +299,10 @@ class ExperimentRunnerHelper:
         plt.xlabel("Number of samples")
         plt.ylabel("Fraction with all \nintervention targets correct")
         plt.tight_layout()
-        # plt.savefig(f"{self.plot_folder}/percent_correct_order.png")
         plt.savefig(f"{self.plot_folder}/percent_correct_order.pdf")
-        # if local: plt.savefig(os.path.expanduser("~/Downloads/percent_correct_order.png"))
 
 
-class ExperimentRunner2:
+class ExperimentRunner:
     def __init__(
         self,
         num_latent: int,
@@ -503,7 +358,6 @@ class ExperimentRunner2:
                 list(range(self.num_latent)), 
                 upper_triangular_h=False,
                 orthogonal_h=False,
-                rational=False,
                 no_perm=True,
                 shuffle_targets=True,
                 nnodes_obs=self.nnodes_obs,

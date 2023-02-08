@@ -13,18 +13,17 @@ from src.utils.linalg import normalize_H
 
 
 
-def get_intervention(
-    B_obs: np.ndarray, 
-    ix: int, 
-    iv_type="hard"
-):
+def get_intervention(B_obs, ix, iv_type="hard"):
     p = B_obs.shape[0]
     Bk = B_obs.copy()
     new_vals = np.zeros(p)
     new_vals[ix] = np.round(np.random.uniform(6, 8), 2)
 
     if iv_type == "soft":
-        new_vals[ix+1:] = np.round(np.random.uniform(.25, 1, size=p-ix-1), 2)
+        print("soft intervention")
+        for p_ix, val in enumerate(B_obs[ix]):
+            if val != 0:
+                new_vals[p_ix] = np.round(np.random.uniform(1.75, 2), 2)
     
     Bk[ix, :] = new_vals
     return Bk
@@ -36,11 +35,13 @@ def rand_model(
     perm: list = None,
     unipotent: bool = False,
     observed: bool = False,
-    upper_triangular_h: bool = True,
+    upper_triangular_h: bool = False,
     orthogonal_h: bool = False,
     seed: int = None,
     no_perm: bool = False,
-    shuffle_targets: bool = False
+    shuffle_targets: bool = False,
+    nnodes_obs: int = None,
+    iv_type: str = "hard"
 ):
     if seed is not None:
         np.random.seed(seed)
@@ -60,17 +61,22 @@ def rand_model(
     B_obs = np.round(Omega_half @ (I - A), 3)
 
     # === CREATE H MATRIX ===
+    nnodes_obs = p if nnodes_obs is None else nnodes_obs
+
     if observed:
         H = np.eye(p, dtype=int)
+    elif upper_triangular_h:
+        H = np.triu(np.round(np.random.uniform(-2, 2, size=(p, nnodes_obs)), 2), k=0)
+        # H = H_ut + np.eye(p)
     else:
-        if upper_triangular_h:
-            H_ut = np.triu(np.round(np.random.uniform(-2, 2, size=(p, p)), 2), k=1)
-            H = H_ut + np.eye(p)
-        else:
-            H = np.round(np.random.uniform(-2, 2, size=(p, p)), 2)
-            H = normalize_H(H)
-        if orthogonal_h:
-            H = orth(H)
+        H = np.random.uniform(-2, 2, size=(p, nnodes_obs))
+        # signs = (np.random.binomial(1, 0.5, size=(p, nnodes_obs)) - 1/2) * 2
+        # H = H * signs
+        H = normalize_H(H)
+
+    if orthogonal_h:
+        H = orth(H)
+    
 
     # === CREATE P MATRIX ===
     perm = list(range(p)) if perm is None else perm
@@ -90,7 +96,7 @@ def rand_model(
 
     Bs = []
     for ix in targets:
-        B = get_intervention(B_obs, ix)
+        B = get_intervention(B_obs, ix, iv_type=iv_type)
         Bs.append(B)
 
     return Dataset(

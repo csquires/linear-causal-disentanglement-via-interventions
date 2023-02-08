@@ -2,7 +2,7 @@
 from argparse import ArgumentParser, BooleanOptionalAction
 
 # === IMPORTS: LOCAL ===
-from src.run_experiment import ExperimentRunner2
+from src.run_experiment import ExperimentRunner
 
 # === ARGUMENT PARSING ===
 parser = ArgumentParser()
@@ -22,11 +22,11 @@ parser.add_argument("--density", type=float, default=0.75)
 parser.add_argument("--rank_gamma", type=float, default=0.99)
 parser.add_argument("--seed", type=int, default=8164)
 parser.add_argument("--iv_type", type=str, default="hard")
-parser.add_argument("--overwrite", type=BooleanOptionalAction, default=False)
+parser.add_argument("--overwrite", type=BooleanOptionalAction, default=True)
 args = parser.parse_args()
 # ===============================================
 
-er = ExperimentRunner2(
+er = ExperimentRunner(
     args.nnodes,
     args.nsamples_list,
     args.nruns,
