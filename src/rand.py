@@ -29,6 +29,62 @@ def get_intervention(B_obs, ix, iv_type="hard"):
     return Bk
 
 
+def get_intervention_multinode(B_obs, ixs, iv_type="hard"):
+    p = B_obs.shape[0]
+    Bk = B_obs.copy()
+    for ix in ixs:
+        new_vals = np.zeros(p)
+        new_vals[ix] = np.round(np.random.uniform(6, 8), 2)
+        Bk[ix, :] = new_vals
+
+    if iv_type == "soft":
+        raise ValueError("soft interventions not implemented")
+    
+    return Bk
+
+
+def rand_model_multinode_intervention(
+    latent_dag: cd.DAG,
+    ix2targets: list,
+    nnodes_obs: int = None,
+    seed = None
+):
+    if seed is not None:
+        np.random.seed(seed)
+        random.seed(seed)
+    
+    g = cd.rand.rand_weights(latent_dag)
+    p = latent_dag.nnodes
+
+    # === CREATE OBSERVATIONAL B MATRIX ===
+    I = np.eye(p)
+    A = g.to_amat()
+    Omega_half = np.diag(np.random.uniform(2, 4, p))
+    B_obs = np.round(Omega_half @ (I - A), 3)
+
+    # === CREATE H MATRIX ===
+    nnodes_obs = p if nnodes_obs is None else nnodes_obs
+    H = np.random.uniform(-2, 2, size=(p, nnodes_obs))
+    H = normalize_H(H)
+
+    # === CREATE P MATRIX ===
+    P = np.eye(p, dtype=int)
+
+    # === CREATE INTERVENTIONAL B MATRICES ===
+    Bs = []
+    for ixs in ix2targets:
+        B = get_intervention_multinode(B_obs, ixs, iv_type="hard")
+        Bs.append(B)
+
+    return Dataset(
+        B_obs,
+        P,
+        H,
+        Bs,
+        dict(enumerate(ix2targets))
+    )
+
+
 def rand_model(
     latent_dag: cd.DAG,
     nodes2num_ivs: dict,
